@@ -71,7 +71,7 @@ namespace Sim
 
 SimObject::SimObject()
 {
-   objectName            = NULL;
+   mObjectName = NULL;
    mOriginalName         = NULL;
    mInternalName         = NULL;
    nextNameObject        = nullptr;
@@ -128,10 +128,10 @@ SimObject::~SimObject()
 
    AssertFatal(nextNameObject == nullptr,avar(
       "SimObject::~SimObject:  Not removed from dictionary: name %s, id %i",
-      objectName, mId));
+	   mObjectName, mId));
    AssertFatal(nextManagerNameObject == nullptr,avar(
       "SimObject::~SimObject:  Not removed from manager dictionary: name %s, id %i",
-      objectName,mId));
+	   mObjectName,mId));
    AssertFatal(mFlags.test(Added) == 0, "SimObject::object "
       "missing call to SimObject::onRemove");
 }
@@ -149,7 +149,7 @@ void SimObject::initPersistFields()
 {
    addGroup( "Ungrouped" );
 
-      addProtectedField( "name", TypeName, Offset(objectName, SimObject), &setProtectedName, &defaultProtectedGetFn, 
+      addProtectedField( "name", TypeName, Offset(mObjectName, SimObject), &setProtectedName, &defaultProtectedGetFn,
          "Optional global name of this object." );
                   
    endGroup( "Ungrouped" );
@@ -211,8 +211,8 @@ String SimObject::describeSelf() const
    
    if( mId != 0 )
       desc = avar( "%s|id: %i", desc.c_str(), mId );
-   if( objectName )
-      desc = avar( "%s|name: %s", desc.c_str(), objectName );
+   if(mObjectName)
+      desc = avar( "%s|name: %s", desc.c_str(), mObjectName);
    if( mInternalName )
       desc = avar( "%s|internal: %s", desc.c_str(), mInternalName );
    if( mNameSpace )
@@ -320,7 +320,7 @@ void SimObject::writeFields(Stream &stream, U32 tabStop)
 
          U32 nBufferSize = dStrlen( val ) + 1;
          FrameTemp<char> valCopy( nBufferSize );
-         dStrcpy( (char *)valCopy, val );
+         dStrcpy( (char *)valCopy, val, nBufferSize );
 
          if (!writeField(f->pFieldname, valCopy))
             continue;
@@ -347,7 +347,7 @@ void SimObject::writeFields(Stream &stream, U32 tabStop)
          }
 
          expandEscape((char*)expandedBuffer + dStrlen(expandedBuffer), val);
-         dStrcat(expandedBuffer, "\";\r\n");
+         dStrcat(expandedBuffer, "\";\r\n", expandedBufferSize);
 
          stream.writeTabs(tabStop);
          stream.write(dStrlen(expandedBuffer),expandedBuffer);
@@ -402,12 +402,12 @@ bool SimObject::save(const char *pcFileName, bool bOnlySelected, const char *pre
    char docRoot[256];
    char modRoot[256];
 
-   dStrcpy(docRoot, pcFileName);
+   dStrcpy(docRoot, pcFileName, 256);
    char *p = dStrrchr(docRoot, '/');
    if (p) *++p = '\0';
    else  docRoot[0] = '\0';
 
-   dStrcpy(modRoot, pcFileName);
+   dStrcpy(modRoot, pcFileName, 256);
    p = dStrchr(modRoot, '/');
    if (p) *++p = '\0';
    else  modRoot[0] = '\0';
@@ -529,17 +529,17 @@ void SimObject::onTamlCustomRead(TamlCustomNodes const& customNodes)
                for (TamlCustomFieldVector::const_iterator fieldItr = fields.begin(); fieldItr != fields.end(); ++fieldItr)
                {
                   // Fetch field.
-                  const TamlCustomField* pField = *fieldItr;
+                  const TamlCustomField* cField = *fieldItr;
 
                   // Fetch field name.
-                  StringTableEntry fieldName = pField->getFieldName();
+                  StringTableEntry fieldName = cField->getFieldName();
 
                   const AbstractClassRep::Field* field = findField(fieldName);
 
                   // Check common fields.
                   if (field)
                   {
-                     setDataField(fieldName, buf, pField->getFieldValue());
+                     setDataField(fieldName, buf, cField->getFieldValue());
                   }
                   else
                   {
@@ -754,9 +754,9 @@ void SimObject::setId(SimObjectId newId)
 
 void SimObject::assignName(const char *name)
 {
-   if( objectName && !isNameChangeAllowed() )
+   if(mObjectName && !isNameChangeAllowed() )
    {
-      Con::errorf( "SimObject::assignName - not allowed to change name of object '%s'", objectName );
+      Con::errorf( "SimObject::assignName - not allowed to change name of object '%s'", mObjectName);
       return;
    }
    
@@ -781,7 +781,7 @@ void SimObject::assignName(const char *name)
       Sim::gNameDictionary->remove( this );
    }
       
-   objectName = newName;
+   mObjectName = newName;
    
    if( mGroup )
       mGroup->mNameDictionary.insert( this );
@@ -1028,8 +1028,8 @@ void SimObject::setDataField(StringTableEntry slotName, const char *array, const
       else
       {
          char buf[256];
-         dStrcpy(buf, slotName);
-         dStrcat(buf, array);
+         dStrcpy(buf, slotName, 256);
+         dStrcat(buf, array, 256);
          StringTableEntry permanentSlotName = StringTable->insert(buf);
          mFieldDictionary->setFieldValue(permanentSlotName, value);
          onDynamicModified( permanentSlotName, value );
@@ -1069,8 +1069,8 @@ const char *SimObject::getDataField(StringTableEntry slotName, const char *array
       else
       {
          static char buf[256];
-         dStrcpy(buf, slotName);
-         dStrcat(buf, array);
+         dStrcpy(buf, slotName, 256);
+         dStrcat(buf, array, 256);
          if (const char* val = mFieldDictionary->getFieldValue(StringTable->insert(buf)))
             return val;
       }
@@ -1310,8 +1310,8 @@ U32 SimObject::getDataFieldType( StringTableEntry slotName, const char* array )
    else
    {
       static char buf[256];
-      dStrcpy( buf, slotName );
-      dStrcat( buf, array );
+      dStrcpy( buf, slotName, 256 );
+      dStrcat( buf, array, 256 );
 
       return mFieldDictionary->getFieldType( StringTable->insert( buf ) );
    }
@@ -1333,8 +1333,8 @@ void SimObject::setDataFieldType(const U32 fieldTypeId, StringTableEntry slotNam
    else
    {
       static char buf[256];
-      dStrcpy( buf, slotName );
-      dStrcat( buf, array );
+      dStrcpy( buf, slotName, 256 );
+      dStrcat( buf, array, 256 );
 
       mFieldDictionary->setFieldType( StringTable->insert( buf ), fieldTypeId );
       onDynamicModified( slotName, mFieldDictionary->getFieldValue(slotName) );
@@ -1354,8 +1354,8 @@ void SimObject::setDataFieldType(const char *typeName, StringTableEntry slotName
    else
    {
       static char buf[256];
-      dStrcpy( buf, slotName );
-      dStrcat( buf, array );
+      dStrcpy( buf, slotName, 256 );
+      dStrcat( buf, array, 256 );
       StringTableEntry permanentSlotName = StringTable->insert(buf);
 
       mFieldDictionary->setFieldType( permanentSlotName, typeName );
@@ -1373,7 +1373,7 @@ SimObject::SimObject(const SimObject& other, bool temp_clone)
 {
    is_temp_clone = temp_clone;
 
-   objectName = other.objectName;
+   mObjectName = other.mObjectName;
    mOriginalName = other.mOriginalName;
    nextNameObject = other.nextNameObject;
    nextManagerNameObject = other.nextManagerNameObject;
@@ -2271,7 +2271,7 @@ DefineEngineMethod( SimObject, dumpGroupHierarchy, void, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, isMethod, bool, ( const char* methodName ),,
+DefineEngineMethod( SimObject, isMethod, bool, ( const char* methodName ),,
    "Test whether the given method is defined on this object.\n"
    "@param The name of the method.\n"
    "@return True if the object implements the given method." )
@@ -2291,7 +2291,7 @@ DefineEngineMethod( SimObject, isChildOfGroup, bool, ( SimGroup* group ),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getClassNamespace, const char*, (),,
+DefineEngineMethod( SimObject, getClassNamespace, const char*, (),,
    "Get the name of the class namespace assigned to this object.\n"
    "@return The name of the 'class' namespace." )
 {
@@ -2300,7 +2300,7 @@ DefineConsoleMethod( SimObject, getClassNamespace, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getSuperClassNamespace, const char*, (),,
+DefineEngineMethod( SimObject, getSuperClassNamespace, const char*, (),,
    "Get the name of the superclass namespace assigned to this object.\n"
    "@return The name of the 'superClass' namespace." )
 {
@@ -2309,7 +2309,7 @@ DefineConsoleMethod( SimObject, getSuperClassNamespace, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setClassNamespace, void, ( const char* name ),,
+DefineEngineMethod( SimObject, setClassNamespace, void, ( const char* name ),,
    "Assign a class namespace to this object.\n"
    "@param name The name of the 'class' namespace for this object." )
 {
@@ -2318,7 +2318,7 @@ DefineConsoleMethod( SimObject, setClassNamespace, void, ( const char* name ),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setSuperClassNamespace, void, ( const char* name ),,
+DefineEngineMethod( SimObject, setSuperClassNamespace, void, ( const char* name ),,
    "Assign a superclass namespace to this object.\n"
    "@param name The name of the 'superClass' namespace for this object." )
 {
@@ -2345,7 +2345,7 @@ DefineEngineMethod( SimObject, setIsSelected, void, ( bool state ), ( true ),
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, isExpanded, bool, (),,
+DefineEngineMethod( SimObject, isExpanded, bool, (),,
    "Get whether the object has been marked as expanded. (in editor)\n"
    "@return True if the object is marked expanded." )
 {
@@ -2354,7 +2354,7 @@ DefineConsoleMethod( SimObject, isExpanded, bool, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setIsExpanded, void, ( bool state ), ( true ),
+DefineEngineMethod( SimObject, setIsExpanded, void, ( bool state ), ( true ),
    "Set whether the object has been marked as expanded. (in editor)\n"
    "@param state True if the object is to be marked expanded; false if not." )
 {
@@ -2363,7 +2363,7 @@ DefineConsoleMethod( SimObject, setIsExpanded, void, ( bool state ), ( true ),
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getFilename, const char*, (),,
+DefineEngineMethod( SimObject, getFilename, const char*, (),,
    "Returns the filename the object is attached to.\n"
    "@return The name of the file the object is associated with; usually the file the object was loaded from." )
 {
@@ -2372,7 +2372,7 @@ DefineConsoleMethod( SimObject, getFilename, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setFilename, void, ( const char* fileName ),,
+DefineEngineMethod( SimObject, setFilename, void, ( const char* fileName ),,
    "Sets the object's file name and path\n"
    "@param fileName The name of the file to associate this object with." )
 {
@@ -2381,7 +2381,7 @@ DefineConsoleMethod( SimObject, setFilename, void, ( const char* fileName ),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getDeclarationLine, S32, (),,
+DefineEngineMethod( SimObject, getDeclarationLine, S32, (),,
    "Get the line number at which the object is defined in its file.\n\n"
    "@return The line number of the object's definition in script.\n"
    "@see getFilename()")
@@ -2418,7 +2418,7 @@ DefineEngineFunction( debugEnumInstances, void, ( const char* className, const c
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, assignFieldsFrom, void, ( SimObject* fromObject ),,
+DefineEngineMethod( SimObject, assignFieldsFrom, void, ( SimObject* fromObject ),,
    "Copy fields from another object onto this one.  The objects must "
    "be of same type. Everything from the object will overwrite what's "
    "in this object; extra fields in this object will remain. This "
@@ -2439,7 +2439,7 @@ DefineEngineMethod( SimObject, assignPersistentId, void, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getCanSave, bool, (),,
+DefineEngineMethod( SimObject, getCanSave, bool, (),,
    "Get whether the object will be included in saves.\n"
    "@return True if the object will be saved; false otherwise." )
 {
@@ -2448,7 +2448,7 @@ DefineConsoleMethod( SimObject, getCanSave, bool, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setCanSave, void, ( bool value ), ( true ),
+DefineEngineMethod( SimObject, setCanSave, void, ( bool value ), ( true ),
    "Set whether the object will be included in saves.\n"
    "@param value If true, the object will be included in saves; if false, it will be excluded." )
 {
@@ -2529,7 +2529,7 @@ DefineEngineMethod( SimObject, setHidden, void, ( bool value ), ( true ),
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, dumpMethods, ArrayObject*, (),,
+DefineEngineMethod( SimObject, dumpMethods, ArrayObject*, (),,
    "List the methods defined on this object.\n\n"
    "Each description is a newline-separated vector with the following elements:\n"
    "- Minimum number of arguments.\n"
@@ -2776,7 +2776,7 @@ DefineEngineMethod( SimObject, dump, void, ( bool detailed ), ( false ),
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, save, bool, ( const char* fileName, bool selectedOnly, const char* preAppendString ), ( false, "" ),
+DefineEngineMethod( SimObject, save, bool, ( const char* fileName, bool selectedOnly, const char* preAppendString ), ( false, "" ),
    "Save out the object to the given file.\n"
    "@param fileName The name of the file to save to."
    "@param selectedOnly If true, only objects marked as selected will be saved out.\n"
@@ -2808,7 +2808,7 @@ DefineEngineMethod( SimObject, getName, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getClassName, const char*, (),,
+DefineEngineMethod( SimObject, getClassName, const char*, (),,
    "Get the name of the C++ class which the object is an instance of.\n"
    "@return The name of the C++ class of the object." )
 {
@@ -2818,7 +2818,7 @@ DefineConsoleMethod( SimObject, getClassName, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, isField, bool, ( const char* fieldName ),,
+DefineEngineMethod( SimObject, isField, bool, ( const char* fieldName ),,
    "Test whether the given field is defined on this object.\n"
    "@param fieldName The name of the field.\n"
    "@return True if the object implements the given field." )
@@ -2828,7 +2828,7 @@ DefineConsoleMethod( SimObject, isField, bool, ( const char* fieldName ),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getFieldValue, const char*, ( const char* fieldName, S32 index ), ( -1 ),
+DefineEngineMethod( SimObject, getFieldValue, const char*, ( const char* fieldName, S32 index ), ( -1 ),
    "Return the value of the given field on this object.\n"
    "@param fieldName The name of the field.  If it includes a field index, the index is parsed out.\n"
    "@param index Optional parameter to specify the index of an array field separately.\n"
@@ -2872,7 +2872,7 @@ DefineConsoleMethod( SimObject, getFieldValue, const char*, ( const char* fieldN
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setFieldValue, bool, ( const char* fieldName, const char* value, S32 index ), ( -1 ),
+DefineEngineMethod( SimObject, setFieldValue, bool, ( const char* fieldName, const char* value, S32 index ), ( -1 ),
    "Set the value of the given field on this object.\n"
    "@param fieldName The name of the field to assign to.  If it includes an array index, the index will be parsed out.\n"
    "@param value The new value to assign to the field.\n"
@@ -2919,7 +2919,7 @@ DefineConsoleMethod( SimObject, setFieldValue, bool, ( const char* fieldName, co
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getFieldType, const char*, ( const char* fieldName ),,
+DefineEngineMethod( SimObject, getFieldType, const char*, ( const char* fieldName ),,
    "Get the console type code of the given field.\n"
    "@return The numeric type code for the underlying console type of the given field." )
 {
@@ -2934,7 +2934,7 @@ DefineConsoleMethod( SimObject, getFieldType, const char*, ( const char* fieldNa
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, setFieldType, void, ( const char* fieldName, const char* type ),,
+DefineEngineMethod( SimObject, setFieldType, void, ( const char* fieldName, const char* type ),,
    "Set the console type code for the given field.\n"
    "@param fieldName The name of the dynamic field to change to type for.\n"
    "@param type The name of the console type.\n"
@@ -2945,7 +2945,7 @@ DefineConsoleMethod( SimObject, setFieldType, void, ( const char* fieldName, con
 
 //-----------------------------------------------------------------------------
 
-ConsoleMethod( SimObject, call, const char*, 3, 0, "( string method, string args... ) Dynamically call a method on an object.\n"
+DefineEngineStringlyVariadicMethod( SimObject, call, const char*, 3, 0, "( string method, string args... ) Dynamically call a method on an object.\n"
    "@param method Name of method to call.\n"
    "@param args Zero or more arguments for the method.\n"
    "@return The result of the method call." )
@@ -2974,7 +2974,7 @@ DefineEngineMethod( SimObject, getInternalName, const char*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, dumpClassHierarchy, void, (),,
+DefineEngineMethod( SimObject, dumpClassHierarchy, void, (),,
    "Dump the native C++ class hierarchy of this object's C++ class to the console." )
 {
    object->dumpClassHierarchy();
@@ -2982,7 +2982,7 @@ DefineConsoleMethod( SimObject, dumpClassHierarchy, void, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, isMemberOfClass, bool, ( const char* className ),,
+DefineEngineMethod( SimObject, isMemberOfClass, bool, ( const char* className ),,
    "Test whether this object is a member of the specified class.\n"
    "@param className Name of a native C++ class.\n"
    "@return True if this object is an instance of the given C++ class or any of its super classes." )
@@ -3004,7 +3004,7 @@ DefineConsoleMethod( SimObject, isMemberOfClass, bool, ( const char* className )
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, isInNamespaceHierarchy, bool, ( const char* name ),,
+DefineEngineMethod( SimObject, isInNamespaceHierarchy, bool, ( const char* name ),,
    "Test whether the namespace of this object is a direct or indirect child to the given namespace.\n"
    "@param name The name of a namespace.\n"
    "@return True if the given namespace name is within the namespace hierarchy of this object." )
@@ -3039,7 +3039,7 @@ DefineEngineMethod( SimObject, getGroup, SimGroup*, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, delete, void, (),,
+DefineEngineMethod( SimObject, delete, void, (),,
    "Delete and remove the object." )
 {
    object->deleteObject();
@@ -3047,7 +3047,7 @@ DefineConsoleMethod( SimObject, delete, void, (),,
 
 //-----------------------------------------------------------------------------
 
-ConsoleMethod( SimObject,schedule, S32, 4, 0, "( float time, string method, string args... ) Delay an invocation of a method.\n"
+DefineEngineStringlyVariadicMethod( SimObject,schedule, S32, 4, 0, "( float time, string method, string args... ) Delay an invocation of a method.\n"
    "@param time The number of milliseconds after which to invoke the method.  This is a soft limit.\n"
    "@param method The method to call.\n"
    "@param args The arguments with which to call the method.\n"
@@ -3067,7 +3067,7 @@ ConsoleMethod( SimObject,schedule, S32, 4, 0, "( float time, string method, stri
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getDynamicFieldCount, S32, (),,
+DefineEngineMethod( SimObject, getDynamicFieldCount, S32, (),,
    "Get the number of dynamic fields defined on the object.\n"
    "@return The number of dynamic fields defined on the object." )
 {
@@ -3081,7 +3081,7 @@ DefineConsoleMethod( SimObject, getDynamicFieldCount, S32, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getDynamicField, const char*, ( S32 index ),,
+DefineEngineMethod( SimObject, getDynamicField, const char*, ( S32 index ),,
    "Get a value of a dynamic field by index.\n"
    "@param index The index of the dynamic field.\n"
    "@return The value of the dynamic field at the given index or \"\"." )
@@ -3113,7 +3113,7 @@ DefineConsoleMethod( SimObject, getDynamicField, const char*, ( S32 index ),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getFieldCount, S32, (),,
+DefineEngineMethod( SimObject, getFieldCount, S32, (),,
    "Get the number of static fields on the object.\n"
    "@return The number of static fields defined on the object." )
 {
@@ -3135,7 +3135,7 @@ DefineConsoleMethod( SimObject, getFieldCount, S32, (),,
 
 //-----------------------------------------------------------------------------
 
-DefineConsoleMethod( SimObject, getField, const char*, ( S32 index ),,
+DefineEngineMethod( SimObject, getField, const char*, ( S32 index ),,
    "Retrieve the value of a static field by index.\n"
    "@param index The index of the static field.\n"
    "@return The value of the static field with the given index or \"\"." )

@@ -74,7 +74,7 @@ ModuleManager::ModuleManager() :
     mIgnoreLoadedGroups(false)
 {
     // Set module extension.
-    dStrcpy( mModuleExtension, MODULE_MANAGER_MODULE_DEFINITION_EXTENSION );
+    dStrcpy( mModuleExtension, MODULE_MANAGER_MODULE_DEFINITION_EXTENSION, 256 );
 }
 
 //-----------------------------------------------------------------------------
@@ -155,7 +155,7 @@ bool ModuleManager::setModuleExtension( const char* pExtension )
     }
 
     // Set module extension.
-    dStrcpy( mModuleExtension, pExtension );
+    dStrcpy( mModuleExtension, pExtension, 256 );
 
     return true;
 }
@@ -454,6 +454,15 @@ bool ModuleManager::loadModuleGroup( const char* pModuleGroup )
                 Con::errorf( "Module Manager: Cannot load module group '%s' as the module Id '%s' at version Id '%d' as it failed to have the script file '%s' loaded.",
                     moduleGroup, pLoadReadyModuleDefinition->getModuleId(), pLoadReadyModuleDefinition->getVersionId(), pLoadReadyModuleDefinition->getModuleScriptFilePath() );
             }
+        }
+        else
+        {
+           // Is the create method available?
+           if (pScopeSet->isMethod(pLoadReadyModuleDefinition->getCreateFunction()))
+           {
+              // Yes, so call the create method.
+              Con::executef(pScopeSet, pLoadReadyModuleDefinition->getCreateFunction());
+           }
         }
 
         // Raise notifications.

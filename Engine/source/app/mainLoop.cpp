@@ -61,6 +61,7 @@
 
 // For the TickMs define... fix this for T2D...
 #include "T3D/gameBase/processList.h"
+#include "cinterface/cinterface.h"
 
 #ifdef TORQUE_ENABLE_VFS
 #include "platform/platformVFS.h"
@@ -267,6 +268,9 @@ void StandardMainLoop::init()
    
    ThreadPool::GlobalThreadPool::createSingleton();
 
+   // Set engineAPI initialized to true
+   engineAPI::gIsInitialized = true;
+
    // Initialize modules.
    
    EngineModuleManager::initializeSystem();
@@ -440,6 +444,11 @@ bool StandardMainLoop::handleCommandLine( S32 argc, const char **argv )
    // directly because the resource system restricts
    // access to the "root" directory.
 
+   bool foundExternalMain = false;
+   CInterface::CallMain(&foundExternalMain);
+   if (foundExternalMain)
+      return true;
+
 #ifdef TORQUE_ENABLE_VFS
    Zip::ZipArchive *vfs = openEmbeddedVFSArchive();
    bool useVFS = vfs != NULL;
@@ -495,7 +504,7 @@ bool StandardMainLoop::handleCommandLine( S32 argc, const char **argv )
          S32 pathLen = dStrlen( fdd.mFile );
          FrameTemp<char> szPathCopy( pathLen + 1);
 
-         dStrcpy( szPathCopy, fdd.mFile );
+         dStrcpy( szPathCopy, fdd.mFile, pathLen + 1 );
          //forwardslash( szPathCopy );
 
          const char *path = dStrrchr(szPathCopy, '/');

@@ -37,6 +37,7 @@
 #include "core/strings/stringUnit.h"
 #include "console/console.h"
 #include "console/consoleInternal.h"
+#include "cinterface/cinterface.h"
 
 //#define TORQUE_VALIDATE_STACK
 
@@ -95,19 +96,17 @@ static void getFieldComponent(SimObject* object, StringTableEntry field, const c
 
       // Translate xyzw and rgba into the indexed component 
       // of the variable or field.
-      //
-      // Review: Should we use strncpy to prevent a buffer overflow?
       if (subField == xyzw[0] || subField == rgba[0])
-         dStrcpy(val, StringUnit::getUnit(prevVal, 0, " \t\n"));
+         dStrcpy(val, StringUnit::getUnit(prevVal, 0, " \t\n"), 128);
 
       else if (subField == xyzw[1] || subField == rgba[1])
-         dStrcpy(val, StringUnit::getUnit(prevVal, 1, " \t\n"));
+         dStrcpy(val, StringUnit::getUnit(prevVal, 1, " \t\n"), 128);
 
       else if (subField == xyzw[2] || subField == rgba[2])
-         dStrcpy(val, StringUnit::getUnit(prevVal, 2, " \t\n"));
+         dStrcpy(val, StringUnit::getUnit(prevVal, 2, " \t\n"), 128);
 
       else if (subField == xyzw[3] || subField == rgba[3])
-         dStrcpy(val, StringUnit::getUnit(prevVal, 3, " \t\n"));
+         dStrcpy(val, StringUnit::getUnit(prevVal, 3, " \t\n"), 128);
 
       else
          val[0] = 0;
@@ -157,19 +156,17 @@ static void setFieldComponent(SimObject* object, StringTableEntry field, const c
 
    // Insert the value into the specified 
    // component of the string.
-   //
-   // Review: Should we use strncpy to prevent a buffer overflow?
    if (subField == xyzw[0] || subField == rgba[0])
-      dStrcpy(val, StringUnit::setUnit(prevVal, 0, strValue, " \t\n"));
+      dStrcpy(val, StringUnit::setUnit(prevVal, 0, strValue, " \t\n"), 128);
 
    else if (subField == xyzw[1] || subField == rgba[1])
-      dStrcpy(val, StringUnit::setUnit(prevVal, 1, strValue, " \t\n"));
+      dStrcpy(val, StringUnit::setUnit(prevVal, 1, strValue, " \t\n"), 128);
 
    else if (subField == xyzw[2] || subField == rgba[2])
-      dStrcpy(val, StringUnit::setUnit(prevVal, 2, strValue, " \t\n"));
+      dStrcpy(val, StringUnit::setUnit(prevVal, 2, strValue, " \t\n"), 128);
 
    else if (subField == xyzw[3] || subField == rgba[3])
-      dStrcpy(val, StringUnit::setUnit(prevVal, 3, strValue, " \t\n"));
+      dStrcpy(val, StringUnit::setUnit(prevVal, 3, strValue, " \t\n"), 128);
 
    if (val[0] != 0)
    {
@@ -404,11 +401,11 @@ ConsoleValueRef CodeInterpreter::exec(U32 ip,
    breakContinueLabel:
       OPCodeReturn ret = (this->*gOpCodeArray[mCurrentInstruction])(ip);
       if (ret == OPCodeReturn::exitCode)
-         goto exitLabel;
+         break;
       else if (ret == OPCodeReturn::breakContinue)
          goto breakContinueLabel;
    }
-exitLabel:
+
    if (telDebuggerOn && setFrame < 0)
       TelDebugger->popStackFrame();
 
@@ -420,22 +417,22 @@ exitLabel:
       if (gEvalState.traceOn)
       {
          sTraceBuffer[0] = 0;
-         dStrcat(sTraceBuffer, "Leaving ");
+         dStrcat(sTraceBuffer, "Leaving ", 1024);
 
          if (packageName)
          {
-            dStrcat(sTraceBuffer, "[");
-            dStrcat(sTraceBuffer, packageName);
-            dStrcat(sTraceBuffer, "]");
+            dStrcat(sTraceBuffer, "[", 1024);
+            dStrcat(sTraceBuffer, packageName, 1024);
+            dStrcat(sTraceBuffer, "]", 1024);
          }
          if (thisNamespace && thisNamespace->mName)
          {
-            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), sizeof(sTraceBuffer) - dStrlen(sTraceBuffer),
+            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), (U32)(sizeof(sTraceBuffer) - dStrlen(sTraceBuffer)),
                "%s::%s() - return %s", thisNamespace->mName, mThisFunctionName, STR.getStringValue());
          }
          else
          {
-            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), sizeof(sTraceBuffer) - dStrlen(sTraceBuffer),
+            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), (U32)(sizeof(sTraceBuffer) - dStrlen(sTraceBuffer)),
                "%s() - return %s", mThisFunctionName, STR.getStringValue());
          }
          Con::printf("%s", sTraceBuffer);
@@ -471,31 +468,31 @@ void CodeInterpreter::parseArgs(U32 &ip)
       if (gEvalState.traceOn)
       {
          sTraceBuffer[0] = 0;
-         dStrcat(sTraceBuffer, "Entering ");
+         dStrcat(sTraceBuffer, "Entering ", 1024);
 
          if (mExec.packageName)
          {
-            dStrcat(sTraceBuffer, "[");
-            dStrcat(sTraceBuffer, mExec.packageName);
-            dStrcat(sTraceBuffer, "]");
+            dStrcat(sTraceBuffer, "[", 1024);
+            dStrcat(sTraceBuffer, mExec.packageName, 1024);
+            dStrcat(sTraceBuffer, "]", 1024);
          }
          if (mExec.thisNamespace && mExec.thisNamespace->mName)
          {
-            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), sizeof(sTraceBuffer) - dStrlen(sTraceBuffer),
+            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), (U32)(sizeof(sTraceBuffer) - dStrlen(sTraceBuffer)),
                "%s::%s(", mExec.thisNamespace->mName, mThisFunctionName);
          }
          else
          {
-            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), sizeof(sTraceBuffer) - dStrlen(sTraceBuffer),
+            dSprintf(sTraceBuffer + dStrlen(sTraceBuffer), (U32)(sizeof(sTraceBuffer) - dStrlen(sTraceBuffer)),
                "%s(", mThisFunctionName);
          }
          for (S32 i = 0; i < wantedArgc; i++)
          {
-            dStrcat(sTraceBuffer, mExec.argv[i + 1]);
+            dStrcat(sTraceBuffer, mExec.argv[i + 1], 1024);
             if (i != wantedArgc - 1)
-               dStrcat(sTraceBuffer, ", ");
+               dStrcat(sTraceBuffer, ", ", 1024);
          }
-         dStrcat(sTraceBuffer, ")");
+         dStrcat(sTraceBuffer, ")", 1024);
          Con::printf("%s", sTraceBuffer);
       }
 
@@ -1729,7 +1726,7 @@ OPCodeReturn CodeInterpreter::op_setcurfield(U32 &ip)
 {
    // Save the previous field for parsing vector fields.
    mPrevField = mCurField;
-   dStrcpy(prevFieldArray, curFieldArray);
+   dStrcpy(prevFieldArray, curFieldArray, 256);
    mCurField = CodeToSTE(mCodeBlock->code, ip);
    curFieldArray[0] = 0;
    ip += 2;
@@ -1738,7 +1735,7 @@ OPCodeReturn CodeInterpreter::op_setcurfield(U32 &ip)
 
 OPCodeReturn CodeInterpreter::op_setcurfield_array(U32 &ip)
 {
-   dStrcpy(curFieldArray, STR.getStringValue());
+   dStrcpy(curFieldArray, STR.getStringValue(), 256);
    return OPCodeReturn::success;
 }
 
@@ -1771,7 +1768,7 @@ OPCodeReturn CodeInterpreter::op_setcurfield_this(U32 &ip)
    mCurObject = mThisObject;
 
    mPrevField = mCurField;
-   dStrcpy(prevFieldArray, curFieldArray);
+   dStrcpy(prevFieldArray, curFieldArray, 256);
    mCurField = CodeToSTE(mCodeBlock->code, ip);
    curFieldArray[0] = 0;
    ip += 2;
@@ -2027,7 +2024,7 @@ OPCodeReturn CodeInterpreter::op_callfunc_resolve(U32 &ip)
 
    // Try to look it up.
    mNSEntry = Namespace::find(fnNamespace)->lookup(fnName);
-   if (!mNSEntry)
+   if (!CInterface::GetCInterface().isMethod(fnNamespace, fnName) && !mNSEntry)
    {
       ip += 5;
       Con::warnf(ConsoleLogEntry::General,
@@ -2055,6 +2052,7 @@ OPCodeReturn CodeInterpreter::op_callfunc(U32 &ip)
 
    U32 *code = mCodeBlock->code;
 
+   StringTableEntry fnNamespace = CodeToSTE(mCodeBlock->code, ip + 2);
    StringTableEntry fnName = CodeToSTE(code, ip);
 
    //if this is called from inside a function, append the ip and codeptr
@@ -2072,10 +2070,16 @@ OPCodeReturn CodeInterpreter::op_callfunc(U32 &ip)
    const char *componentReturnValue = "";
    Namespace *ns = NULL;
 
+   bool cFunctionRes = false;
+   const char* cRetRes = NULL;
+
    if (callType == FuncCallExprNode::FunctionCall)
    {
       if (!mNSEntry)
          mNSEntry = Namespace::global()->lookup(fnName);
+
+      StringStackWrapper args(mCallArgc, mCallArgv);
+      cRetRes = CInterface::GetCInterface().CallFunction(fnNamespace, fnName, args.argv, args.argc, &cFunctionRes);
    }
    else if (callType == FuncCallExprNode::MethodCall)
    {
@@ -2106,6 +2110,9 @@ OPCodeReturn CodeInterpreter::op_callfunc(U32 &ip)
          mNSEntry = ns->lookup(fnName);
       else
          mNSEntry = NULL;
+
+      StringStackWrapper args(mCallArgc, mCallArgv);
+      cRetRes = CInterface::GetCInterface().CallMethod(gEvalState.thisObject, fnName, args.argv, args.argc, &cFunctionRes);
    }
    else // it's a ParentCall
    {
@@ -2132,16 +2139,31 @@ OPCodeReturn CodeInterpreter::op_callfunc(U32 &ip)
       nsUsage = mNSEntry->mUsage;
       routingId = 0;
    }
-   if (!mNSEntry || mExec.noCalls)
+   if (!cFunctionRes && (!mNSEntry || mExec.noCalls))
    {
       if (!mExec.noCalls && !(routingId == MethodOnComponent))
       {
-         Con::warnf(ConsoleLogEntry::General, "%s: Unknown command %s.", mCodeBlock->getFileLine(ip - 6), fnName);
          if (callType == FuncCallExprNode::MethodCall)
          {
-            Con::warnf(ConsoleLogEntry::General, "  Object %s(%d) %s",
-               gEvalState.thisObject->getName() ? gEvalState.thisObject->getName() : "",
-               gEvalState.thisObject->getId(), Con::getNamespaceList(ns));
+            if (gEvalState.thisObject != NULL)
+            {
+               // Try to use the name instead of the id
+               StringTableEntry name = gEvalState.thisObject->getName() ? gEvalState.thisObject->getName() : gEvalState.thisObject->getIdString();
+               Con::warnf(ConsoleLogEntry::General, "%s: Unknown method %s.%s Namespace List: %s", mCodeBlock->getFileLine(ip - 6), name, fnName, Con::getNamespaceList(ns));
+            }
+            else
+            {
+               // NULL.
+               Con::warnf(ConsoleLogEntry::General, "%s: Unknown method NULL.%s", mCodeBlock->getFileLine(ip - 6), fnName);
+            }
+         }
+         else if (callType == FuncCallExprNode::ParentCall)
+         {
+            Con::warnf(ConsoleLogEntry::General, "%s: Unknown parent call %s.", mCodeBlock->getFileLine(ip - 6), fnName);
+         }
+         else 
+         {
+            Con::warnf(ConsoleLogEntry::General, "%s: Unknown function %s.", mCodeBlock->getFileLine(ip - 6), fnName);
          }
       }
       STR.popFrame();
@@ -2156,11 +2178,19 @@ OPCodeReturn CodeInterpreter::op_callfunc(U32 &ip)
 
    // ConsoleFunctionType is for any function defined by script.
    // Any 'callback' type is an engine function that is exposed to script.
-   if (mNSEntry->mType == Namespace::Entry::ConsoleFunctionType)
+   if (mNSEntry->mType == Namespace::Entry::ConsoleFunctionType
+      || cFunctionRes)
    {
       ConsoleValueRef ret;
-      if (mNSEntry->mFunctionOffset)
+      if (cFunctionRes)
+      {
+         StringStackConsoleWrapper retVal(1, &cRetRes);
+         ret = retVal.argv[0];
+      }
+      else if (mNSEntry->mFunctionOffset)
+      {
          ret = mNSEntry->mCode->exec(mNSEntry->mFunctionOffset, fnName, mNSEntry->mNamespace, mCallArgc, mCallArgv, false, mNSEntry->mPackage);
+      }
 
       STR.popFrame();
       // Functions are assumed to return strings, so look ahead to see if we can skip the conversion
@@ -2332,7 +2362,7 @@ OPCodeReturn CodeInterpreter::op_callfunc_pointer(U32 &ip)
    {
       if (!mExec.noCalls)
       {
-         Con::warnf(ConsoleLogEntry::General, "%s: Unknown command %s.", mCodeBlock->getFileLine(ip - 6), fnName);
+         Con::warnf(ConsoleLogEntry::General, "%s: Unknown function %s.", mCodeBlock->getFileLine(ip - 6), fnName);
       }
       STR.popFrame();
       CSTK.popFrame();
@@ -2376,9 +2406,6 @@ OPCodeReturn CodeInterpreter::op_callfunc_pointer(U32 &ip)
    else
    {
       const char* nsName = "";
-
-      Namespace::Entry::CallbackUnion * nsCb = &mNSEntry->cb;
-      const char * nsUsage = mNSEntry->mUsage;
 
 #ifndef TORQUE_DEBUG
       // [tom, 12/13/2006] This stops tools functions from working in the console,
@@ -2515,7 +2542,7 @@ OPCodeReturn CodeInterpreter::op_callfunc_this(U32 &ip)
    ip += 2;
    CSTK.getArgcArgv(fnName, &mCallArgc, &mCallArgv);
 
-   Namespace *ns = mThisObject->getNamespace();
+   Namespace *ns = mThisObject ? mThisObject->getNamespace() : NULL;
    if (ns)
       mNSEntry = ns->lookup(fnName);
    else
@@ -2525,10 +2552,17 @@ OPCodeReturn CodeInterpreter::op_callfunc_this(U32 &ip)
    {
       if (!mExec.noCalls)
       {
-         Con::warnf(ConsoleLogEntry::General, "%s: Unknown command %s.", mCodeBlock->getFileLine(ip - 6), fnName);
-         Con::warnf(ConsoleLogEntry::General, "  Object %s(%d) %s",
-            mThisObject->getName() ? mThisObject->getName() : "",
-            mThisObject->getId(), Con::getNamespaceList(ns));
+         if (mThisObject)
+         {
+            // Try to use the name instead of the id
+            StringTableEntry name = mThisObject->getName() ? mThisObject->getName() : mThisObject->getIdString();
+            Con::warnf(ConsoleLogEntry::General, "%s: Unknown method %s.%s Namespace List: %s", mCodeBlock->getFileLine(ip - 6), name, fnName, Con::getNamespaceList(ns));
+         }
+         else
+         {
+            // At least let the scripter know that they access the object.
+            Con::warnf(ConsoleLogEntry::General, "%s: Unknown method NULL.%s", mCodeBlock->getFileLine(ip - 6), fnName);
+         }
       }
       STR.popFrame();
       CSTK.popFrame();
@@ -2571,8 +2605,6 @@ OPCodeReturn CodeInterpreter::op_callfunc_this(U32 &ip)
    }
    else
    {
-      Namespace::Entry::CallbackUnion * nsCb = &mNSEntry->cb;
-      const char * nsUsage = mNSEntry->mUsage;
       const char* nsName = ns ? ns->mName : "";
 #ifndef TORQUE_DEBUG
       // [tom, 12/13/2006] This stops tools functions from working in the console,

@@ -491,7 +491,7 @@ namespace Con
    bool expandPath(char* pDstPath, U32 size, const char* pSrcPath, const char* pWorkingDirectoryHint = NULL, const bool ensureTrailingSlash = false);
    void collapsePath(char* pDstPath, U32 size, const char* pSrcPath, const char* pWorkingDirectoryHint = NULL);
    bool isBasePath(const char* SrcPath, const char* pBasePath);
-   void ensureTrailingSlash(char* pDstPath, const char* pSrcPath);
+   void ensureTrailingSlash(char* pDstPath, const char* pSrcPath, S32 dstSize);
    bool stripRepeatSlashes(char* pDstPath, const char* pSrcPath, S32 dstSize);
    StringTableEntry getDSOPath(const char *scriptPath);
 
@@ -972,38 +972,38 @@ public:
    /// @ref console_autodoc
    /// @{
 
-   StringCallback sc;   ///< A function/method that returns a string.
-   IntCallback ic;      ///< A function/method that returns an int.
-   FloatCallback fc;    ///< A function/method that returns a float.
-   VoidCallback vc;     ///< A function/method that returns nothing.
-   BoolCallback bc;     ///< A function/method that returns a bool.
-   bool group;          ///< Indicates that this is a group marker.
-   bool ns;             ///< Indicates that this is a namespace marker.
+   StringCallback mSC;   ///< A function/method that returns a string.
+   IntCallback mIC;      ///< A function/method that returns an int.
+   FloatCallback mFC;    ///< A function/method that returns a float.
+   VoidCallback mVC;     ///< A function/method that returns nothing.
+   BoolCallback mBC;     ///< A function/method that returns a bool.
+   bool mGroup;          ///< Indicates that this is a group marker.
+   bool mNS;             ///< Indicates that this is a namespace marker.
                         ///  @deprecated Unused.
-   bool callback;       ///< Is this a callback into script?
+   bool mCallback;       ///< Is this a callback into script?
 
                         /// @}
 
                         /// Minimum number of arguments expected by the function.
-   S32 mina;
+   S32 mMina;
 
    /// Maximum number of arguments accepted by the funtion.  Zero for varargs.
-   S32 maxa;
+   S32 mMaxa;
 
    /// Name of the function/method.
-   const char* funcName;
+   const char* mFuncName;
 
    /// Name of the class namespace to which to add the method.
-   const char* className;
+   const char* mClassName;
 
    /// Usage string for documentation.
-   const char* usage;
+   const char* mUsage;
 
    /// Whether this is a TORQUE_TOOLS only function.
-   bool toolOnly;
+   bool mToolOnly;
 
    /// The extended function header.
-   ConsoleFunctionHeader* header;
+   ConsoleFunctionHeader* mHeader;
 
    /// @name ConsoleConstructor Innards
    ///
@@ -1066,8 +1066,8 @@ public:
    /// @{
 
    ///
-   ConsoleConstructor *next;
-   static ConsoleConstructor *first;
+   ConsoleConstructor *mNext;
+   static ConsoleConstructor *mFirst;
 
    void init(const char* cName, const char* fName, const char *usg, S32 minArgs, S32 maxArgs, bool toolOnly = false, ConsoleFunctionHeader* header = NULL);
 
@@ -1191,11 +1191,6 @@ public:
 #  define ConsoleFunctionGroupBegin(groupName, usage) \
       static ConsoleConstructor cfg_ConsoleFunctionGroup_##groupName##_GroupBegin(NULL,#groupName,usage)
 
-#  define ConsoleFunction(name,returnType,minArgs,maxArgs,usage1) \
-   returnType cf_##name(SimObject *, S32, ConsoleValueRef *argv); \
-   ConsoleConstructor cc_##name##_obj(NULL,#name,cf_##name,usage1,minArgs,maxArgs); \
-      returnType cf_##name(SimObject *, S32 argc, ConsoleValueRef *argv)
-
 #  define ConsoleToolFunction(name,returnType,minArgs,maxArgs,usage1) \
    returnType ctf_##name(SimObject *, S32, ConsoleValueRef *argv); \
    ConsoleConstructor cc_##name##_obj(NULL,#name,ctf_##name,usage1,minArgs,maxArgs, true); \
@@ -1210,24 +1205,6 @@ public:
 
 #  define ConsoleMethodGroupBegin(className, groupName, usage) \
    static ConsoleConstructor cc_##className##_##groupName##_GroupBegin(#className,#groupName,usage)
-
-#  define ConsoleMethod(className,name,returnType,minArgs,maxArgs,usage1) \
-   inline returnType cm_##className##_##name(className *, S32, ConsoleValueRef *argv); \
-   returnType cm_##className##_##name##_caster(SimObject *object, S32 argc, ConsoleValueRef *argv) { \
-         AssertFatal( dynamic_cast<className*>( object ), "Object passed to " #name " is not a " #className "!" ); \
-         conmethod_return_##returnType ) cm_##className##_##name(static_cast<className*>(object),argc,argv); \
-      };                                                                                              \
-      ConsoleConstructor cc_##className##_##name##_obj(#className,#name,cm_##className##_##name##_caster,usage1,minArgs,maxArgs); \
-      inline returnType cm_##className##_##name(className *object, S32 argc, ConsoleValueRef *argv)
-
-#  define ConsoleStaticMethod(className,name,returnType,minArgs,maxArgs,usage1) \
-   inline returnType cm_##className##_##name(S32, ConsoleValueRef *); \
-   returnType cm_##className##_##name##_caster(SimObject *object, S32 argc, ConsoleValueRef *argv) { \
-   conmethod_return_##returnType ) cm_##className##_##name(argc,argv); \
-   }; \
-   ConsoleConstructor \
-   cc_##className##_##name##_obj(#className,#name,cm_##className##_##name##_caster,usage1,minArgs,maxArgs); \
-   inline returnType cm_##className##_##name(S32 argc, ConsoleValueRef *argv)
 
 #  define ConsoleMethodGroupEnd(className, groupName) \
    static ConsoleConstructor cc_##className##_##groupName##_GroupEnd(#className,#groupName,NULL)
@@ -1267,15 +1244,6 @@ public:
       static ConsoleConstructor                                                                       \
          className##name##obj(#className,#name,c##className##name##caster,"",minArgs,maxArgs);        \
       static inline returnType c##className##name(className *object, S32 argc, ConsoleValueRef *argv)
-
-#  define ConsoleStaticMethod(className,name,returnType,minArgs,maxArgs,usage1)                       \
-      static inline returnType c##className##name(S32, ConsoleValueRef*);                                \
-      static returnType c##className##name##caster(SimObject *object, S32 argc, ConsoleValueRef *argv) {  \
-         conmethod_return_##returnType ) c##className##name(argc,argv);                                                        \
-      };                                                                                              \
-      static ConsoleConstructor                                                                       \
-         className##name##obj(#className,#name,c##className##name##caster,"",minArgs,maxArgs);        \
-      static inline returnType c##className##name(S32 argc, ConsoleValueRef *argv)
 
 #define ConsoleDoc( text )
 
